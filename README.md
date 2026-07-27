@@ -1,125 +1,93 @@
-# 🎓 Generador de CVs Docentes — UNMSM
-### Facultad de Derecho y Ciencia Política
+# 🎓 Generador de Documentos de Pago para Bolsistas — UNMSM
 
-Sistema de escritorio para generar CVs en PDF para docentes universitarios,
-a partir de un formulario Google Forms o ingreso manual por el personal administrativo.
+Sistema de escritorio para generar y firmar los **3 documentos requeridos para el cobro de bolsistas** en la Universidad Nacional Mayor de San Marcos (UNMSM).
 
-## 🚧 Estado del proyecto
-En desarrollo
+---
 
 ## 📋 Descripción
-Los docentes llenan un Google Form con sus datos personales, académicos y foto carné
-usando obligatoriamente su correo institucional (@unmsm.edu.pe). El personal administrativo
-descarga el Excel y la carpeta de fotos al cerrar el periodo de registro, ejecuta el programa
-y genera los CVs en PDF automáticamente.
 
-## 🔄 Flujo general
+Los bolsistas de la UNMSM deben presentar mensualmente tres documentos obligatorios para el trámite de su estipendio/pago:
+1. **Declaración Jurada de No Pertenecer a Órganos de Gobierno** (Ley N° 30220).
+2. **Reporte / Consulta de Asistencias** (Documento oficial emitido con la estampa de firma).
+3. **Informe de Actividades** (Con relación de tareas y evidencias fotográficas adjuntas).
 
-    [Periodo abierto - primeras 3 semanas del ciclo (ejemplo)]
-    Docentes llenan Google Forms con correo institucional
-            ↓
-    [Periodo cerrado]
-    Personal descarga Excel + carpeta de fotos desde Drive
-    y los ubica en cualquier lugar de su PC (Descargas, Escritorio, USB, etc.)
-            ↓
-    En la app selecciona:
-        1. El archivo Excel descargado
-        2. La carpeta de fotos descargada
-            ↓
-    App conecta cada registro con su foto por nombre del docente
-    Si no encuentra una foto → alerta + selección manual
-            ↓
-    App genera todos los PDFs automáticamente
-            ↓
-    Personal limpia el Sheets manualmente para el siguiente ciclo
+Esta aplicación simplifica el proceso ofreciendo un menú interactivo para elegir el documento, completar los formularios con autollenado de datos personales y generar los archivos PDF o DOCX firmados en segundos.
 
-## ✅ Decisiones de arquitectura
-- Sin APIs de Google (sin Google Cloud Console, sin tarjetas de crédito)
-- Sin base de datos externa
-- Sin servidor, todo corre localmente en la PC del personal
-- Las fotos se conectan con los registros por el campo "Apellidos y Nombres"
-- Si una foto no se encuentra, el sistema alerta y permite seleccionarla manualmente
-- Los CVs con foto faltante se pueden previsualizar antes de guardar definitivamente
+---
 
-## 🛠️ Tecnologías
-- Python 3
-- customtkinter (GUI)
-- ReportLab (generación de PDF)
-- openpyxl (lectura de Excel)
-- Pillow (procesamiento de imagen)
+## 🛠️ Los 3 Documentos Soportados
 
-## 🗂️ Campos del formulario
-| Campo | Tipo |
-|---|---|
-| Apellidos y Nombres | Texto corto |
-| Foto carné | Subida de imagen |
-| Correo Institucional | Texto corto |
-| Escuela Profesional | Texto corto |
-| Departamento Académico | Texto corto |
-| Categoría / Clase | Texto corto |
-| Formación Académica 1, 2, 3 | Texto corto |
-| Trayectoria | Párrafo |
-| Experiencia Laboral 1, 2, 3 | Texto corto |
+| Documento | Descripción | Acción / Salida |
+|---|---|---|
+| 📜 **Declaración Jurada** | Cumplimiento del Art. 104º de la Ley N° 30220. | Formulario con datos personales, fecha y firma -> **PDF** |
+| 📅 **Reporte de Asistencia** | Documento de asistencias otorgado por la facultad o dependencia. | Carga de archivo (DOCX/PDF) + Firma -> **Salida en PDF** |
+| 📊 **Informe de Actividades** | Detalle de labores del mes con soporte fotográfico. | Formulario de destinatario, tareas, fotos y firma -> **PDF de 2+ páginas** |
 
-## 🖥️ Modos de la aplicación
-| Modo | Descripción |
-|---|---|
-| 📋 Carga masiva | Carga el Excel descargado del Forms y genera todos los CVs |
-| ✏️ Individual manual | El personal ingresa los datos de un docente directamente |
+---
 
-## 📁 Estructura del proyecto
+## ⚠️ Estado y Errores Conocidos (Bugs)
 
-    cv_generator/
-    ├── src/
-    │   ├── main.py           # GUI principal
-    │   ├── pdf_generator.py  # Generador de PDF
-    │   └── data_reader.py    # Lector de Excel
-    ├── assets/               # Logo de la facultad
-    ├── output/               # PDFs generados (ignorado en git)
-    ├── requirements.txt
-    └── README.md
+> [!WARNING]
+> **Bug en Reporte de Asistencias (Estampado de Firmas):**
+> Existe un detalle en desarrollo con el estampado automático de firmas sobre el reporte de asistencias. Dependiendo de la estructura o disposición del archivo `.docx` / `.pdf` provisto por cada facultad, la posición de las firmas puede requerir alineación fina manual o requerir MS Word instalado en Windows para la conversión precisa a PDF.
+
+---
+
+## 🖥️ Flujo de Uso
+
+1. Al abrir la aplicación se presenta una **pantalla inicial con 3 tarjetas**.
+2. Al hacer clic en un documento, se abre el formulario correspondiente:
+   - En **Declaración Jurada**: Ingresa tus datos (DNI, domicilio, correo, etc.), fecha y selecciona la foto de tu firma. Tus datos se guardarán automáticamente para autollenados futuros.
+   - En **Reporte de Asistencias**: Selecciona el archivo `.docx` o `.pdf` recibido y la foto de tu firma para exportar a PDF.
+   - En **Informe de Actividades**: Ingresa el destinatario, las actividades realizadas, adjunta las fotos de evidencia y tu firma.
+3. Haz clic en **Generar** o **Estampar Firma**. Los archivos listos se guardarán automáticamente en la carpeta `output/`.
+4. En cualquier momento puedes pulsar **`← Volver`** para regresar al menú principal.
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+cv_generator/
+├── src/
+│   ├── main.py                     # Punto de entrada y navegación GUI
+│   ├── pdf_generator.py            # Generador ReportLab para Decl. Jurada e Informe
+│   ├── docx_handler.py             # Estampador de firmas en DOCX y PDF de asistencias
+│   ├── user_profile.py             # Gestor de persistencia de datos (Autollenado)
+│   ├── controllers/
+│   │   └── bolsista_controller.py  # Controlador de validaciones y archivos
+│   └── ui/
+│       ├── config.py               # Colores y constantes
+│       ├── utils.py                # Utilidades de centrado y texto
+│       ├── view_seleccion.py       # Pantalla inicial (3 tarjetas)
+│       ├── view_declaracion.py     # Vista de Declaración Jurada
+│       ├── view_asistencia.py      # Vista de Asistencia
+│       └── view_informe.py         # Vista de Informe de Actividades
+├── assets/                         # Escudos y logos institucionales
+├── output/                         # Documentos firmados/generados (PDF/DOCX)
+├── user_profile.json               # Datos del perfil guardado para autollenado
+├── requirements.txt
+└── README.md
+```
+
+---
 
 ## ⚙️ Instalación
 
-Linux / macOS (Bash):
+### Windows (PowerShell):
 
-```
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-Windows (CMD):
-
-```
-python -m venv venv
-venv\Scripts\activate.bat
-python -m pip install -r requirements.txt
-```
-
-Windows (PowerShell):
-
-```
+```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 
-Nota: la carpeta `venv/` ya está listada en `.gitignore`. Si por error ya la añadiste al repositorio, quítala del índice antes de volver a subir:
+---
 
-```
-git rm -r --cached venv
-git commit -m "Remove venv from repo"
-```
+## ▶️ Ejecución
 
-## ▶️ Uso
+Ejecuta la aplicación desde el entorno virtual:
 
-Ejecuta la aplicación con el intérprete del entorno virtual activo:
-
-```
+```powershell
 python src/main.py
 ```
-
-## 👥 Equipo
-- Edgardo Barboza — Desarrollo
-- Maximo Roman — Google Forms / integración

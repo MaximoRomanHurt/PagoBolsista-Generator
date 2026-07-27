@@ -1,215 +1,351 @@
 """
 pdf_generator.py
-Genera el CV en PDF utilizando Platypus (ReportLab).
-Fondo gestionado por callback de página para evitar errores de desbordamiento (LayoutError).
+Generador de PDFs en ReportLab para los documentos de Bolsistas UNMSM:
+1. Declaración Jurada de No Pertenecer a Órganos de Gobierno (Formato Oficial IDÉNTICO).
+2. Informe de Actividades con Evidencias Fotográficas.
 """
 
 import os
-import io
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.lib.utils import ImageReader
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Flowable
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from PIL import Image as PILImage
 from ui.utils import sanitizar_para_reportlab
 
-# ── Paleta de Colores (Armonía Guinda Institucional) ────────────────────
-GUINDA_FACULTAD = colors.HexColor("#4B0002")
-DORADO_LABEL = colors.HexColor("#D4AF37")
-BLANCO = colors.white
-GRIS_TEXTO = colors.HexColor("#2C2C2C")
-
-# ── Dimensiones del Grid ─────────────────────────────────────────────────────
+# ── Dimensiones y Colores ──────────────────────────────────────────────────
 W, H = A4
-ANCHO_COL_IZQ = W * 0.35
-ANCHO_COL_DER = W * 0.65
-PADDING_DER = 24
-ANCHO_LINEA = ANCHO_COL_DER - (PADDING_DER * 2)
+NEGRO = colors.HexColor("#000000")
 
 
-# ── Callbacks de Fondo (Evita usar rowHeights=[H] que rompe el layout) ───────
-def dibujar_fondos_cv(canvas, doc):
-    """Dibuja las dos columnas de color directamente en la lona base."""
-    canvas.saveState()
-    # Barra izquierda Guinda
-    canvas.setFillColor(GUINDA_FACULTAD)
-    canvas.rect(0, 0, ANCHO_COL_IZQ, H, stroke=0, fill=1)
-    # Cuerpo derecho Blanco
-    canvas.setFillColor(BLANCO)
-    canvas.rect(ANCHO_COL_IZQ, 0, ANCHO_COL_DER, H, stroke=0, fill=1)
-    canvas.restoreState()
-
-
-# ── Componentes Visuales Personalizados (Flowables) ──────────────────────────
-class LineaDivisoria(Flowable):
-    """Equivalente a un <hr> con estilos personalizados."""
-    def __init__(self, ancho, color, grosor=1.5):
-        Flowable.__init__(self)
-        self.ancho = ancho
-        self.color = color
-        self.grosor = grosor
-
-    def draw(self):
-        self.canv.saveState()
-        self.canv.setStrokeColor(self.color)
-        self.canv.setLineWidth(self.grosor)
-        self.canv.line(0, 0, self.ancho, 0)
-        self.canv.restoreState()
-
-
-class FotoCircularFlowable(Flowable):
-    """Encapsula la foto circular para que actúe como un elemento de bloque."""
-    def __init__(self, foto_path, radio, color_borde):
-        Flowable.__init__(self)
-        self.foto_path = foto_path
-        self.radio = radio
-        self.color_borde = color_borde
-        self.width = radio * 2
-        self.height = radio * 2
-
-    def draw(self):
-        self.canv.saveState()
-        cx, cy = self.radio, self.radio
-        try:
-            if self.foto_path and os.path.exists(self.foto_path):
-                img = PILImage.open(self.foto_path).convert("RGB")
-                lado = min(img.size)
-                left = (img.size[0] - lado) // 2
-                top = (img.size[1] - lado) // 2
-                img = img.crop((left, top, left + lado, top + lado))
-                img = img.resize((300, 300), PILImage.LANCZOS)
-
-                buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=90)
-                buf.seek(0)
-
-                path = self.canv.beginPath()
-                path.circle(cx, cy, self.radio)
-                self.canv.clipPath(path, stroke=0, fill=0)
-                self.canv.drawImage(ImageReader(buf), 0, 0, width=self.width, height=self.height, preserveAspectRatio=True, mask="auto")
-            else:
-                raise Exception()
-        except Exception:
-            # Silueta Placeholder segura si no encuentra foto
-            self.canv.setFillColor(colors.HexColor("#A38A53"))
-            self.canv.circle(cx, cy, self.radio, stroke=0, fill=1)
-            self.canv.setFillColor(colors.HexColor("#D4AF37"))
-            self.canv.circle(cx, cy + self.radio * 0.35, self.radio * 0.28, stroke=0, fill=1)
-            path = self.canv.beginPath()
-            path.arc(cx - self.radio * 0.45, cy - self.radio * 0.15, cx + self.radio * 0.45, cy + self.radio * 0.55, startAng=0, extent=180)
-            path.close()
-            self.canv.drawPath(path, stroke=0, fill=1)
-        
-        self.canv.restoreState()
-        self.canv.setStrokeColor(self.color_borde)
-        self.canv.setLineWidth(2.5)
-        self.canv.circle(cx, cy, self.radio, stroke=1, fill=0)
-
-
-class LogoFlowable(Flowable):
-    """Renderiza el logo manteniendo su proporción original de forma segura."""
-    def __init__(self, logo_path, ancho_max, alto_max):
-        Flowable.__init__(self)
-        self.logo_path = logo_path
-        self.ancho_max = ancho_max
-        self.alto_max = alto_max
-        self.width = ancho_max
-        self.height = alto_max
-
-    def draw(self):
-        try:
-            if self.logo_path and os.path.exists(self.logo_path):
-                self.canv.drawImage(ImageReader(self.logo_path), 0, 0, width=self.ancho_max, height=self.alto_max, preserveAspectRatio=True, mask="auto")
-        except Exception:
-            pass
-
-
-# ── Generador Principal ──────────────────────────────────────────────────────
-def generar_cv(datos: dict, ruta_salida: str, logo_path: str = None) -> str:
-    # Definimos el lienzo de la página ocupando el 100% del espacio
-    doc = SimpleDocTemplate(ruta_salida, pagesize=A4, leftMargin=0, rightMargin=0, topMargin=0, bottomMargin=0)
+# ── 1. GENERADOR: DECLARACIÓN JURADA (Diseño idéntico al oficial UNMSM) ──────
+def generar_declaracion_jurada(datos: dict, ruta_salida: str, logo_path: str = None) -> str:
+    """Genera la Declaración Jurada oficial de la UNMSM con maquetación exacta."""
+    doc = SimpleDocTemplate(
+        ruta_salida, pagesize=A4,
+        leftMargin=45, rightMargin=45, topMargin=40, bottomMargin=40
+    )
     
     styles = getSampleStyleSheet()
     
-    # Configuramos las fuentes escaladas deseadas
-    style_nombre = ParagraphStyle('Nom', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=15, leading=19, textColor=BLANCO, alignment=1)
-    style_label_izq = ParagraphStyle('Lab', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, leading=12, textColor=DORADO_LABEL)
-    style_valor_izq = ParagraphStyle('Val', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=14, textColor=BLANCO)
+    style_header_unmsm = ParagraphStyle('HeadUNMSM', fontName='Helvetica-Bold', fontSize=13, leading=16, alignment=1)
+    style_header_sub   = ParagraphStyle('HeadSub', fontName='Helvetica', fontSize=10.5, leading=13, alignment=1)
+    style_header_dir   = ParagraphStyle('HeadDir', fontName='Helvetica-Bold', fontSize=11.5, leading=14, alignment=1)
     
-    style_unmsm = ParagraphStyle('Uni', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=18, leading=22, textColor=GUINDA_FACULTAD)
-    style_facultad = ParagraphStyle('Fac', parent=styles['Normal'], fontName='Helvetica', fontSize=11, leading=14, textColor=GRIS_TEXTO)
+    style_tit_main = ParagraphStyle('TitMain', fontName='Helvetica-Bold', fontSize=11, leading=14, alignment=1)
+    style_tit_sub  = ParagraphStyle('TitSub', fontName='Helvetica-Oblique', fontSize=9.5, leading=12, alignment=1)
     
-    style_titulo_der = ParagraphStyle('TitDer', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13, leading=16, textColor=GUINDA_FACULTAD)
-    style_cuerpo = ParagraphStyle('Cue', parent=styles['Normal'], fontName='Helvetica', fontSize=10.5, leading=16, textColor=GRIS_TEXTO, alignment=4)
-    style_bullet = ParagraphStyle('Bul', parent=style_cuerpo, leftIndent=12, firstLineIndent=-12)
+    style_body      = ParagraphStyle('BodyText', fontName='Helvetica', fontSize=9.5, leading=13.5, alignment=4)
+    style_cell_txt  = ParagraphStyle('CellTxt', fontName='Helvetica', fontSize=9.5, leading=12, alignment=1)
+    style_cell_lbl  = ParagraphStyle('CellLbl', fontName='Helvetica', fontSize=8, leading=10, alignment=1)
 
-    # 📦 Elementos Fluyentes - COLUMNA IZQUIERDA
-    story_izq = [
-        Spacer(1, 35),
-        FotoCircularFlowable(datos.get("foto_path"), 65, DORADO_LABEL),
-        Spacer(1, 20),
-        Paragraph(sanitizar_para_reportlab(datos.get("nombre", "")).upper(), style_nombre),
-        Spacer(1, 30)
-    ]
-    
-    def agregar_bloque_izq(titulo, valor):
-        story_izq.append(Paragraph(titulo.upper(), style_label_izq))
-        story_izq.append(Spacer(1, 4))
-        story_izq.append(Paragraph(sanitizar_para_reportlab(valor) if valor else "—", style_valor_izq))
-        story_izq.append(Spacer(1, 18))
+    story = []
 
-    agregar_bloque_izq("Correo institucional", datos.get("correo"))
-    agregar_bloque_izq("Escuela Profesional", datos.get("escuela"))
-    agregar_bloque_izq("Departamento Académico", datos.get("departamento"))
-    agregar_bloque_izq("Tipo de docente", datos.get("tipo_docente"))
-    agregar_bloque_izq("Categoría / Clase", datos.get("categoria"))
-    agregar_bloque_izq("Clase de docente", datos.get("clase_docente"))
-
-    # 📦 Elementos Fluyentes - COLUMNA DERECHA
-    story_der = [Spacer(1, 25)]
-    
+    # Encabezado con Logo y Texto Institucional
+    logo_img = None
     if logo_path and os.path.exists(logo_path):
-        story_der.append(LogoFlowable(logo_path, ANCHO_LINEA, 70))
-        story_der.append(Spacer(1, 20))
-    else:
-        story_der.append(Paragraph("UNMSM", style_unmsm))
-        story_der.append(Paragraph("Facultad de Derecho y Ciencia Política", style_facultad))
-        story_der.append(Spacer(1, 25))
+        try:
+            logo_img = Image(logo_path, width=65, height=70)
+        except Exception:
+            logo_img = ""
+    
+    text_header = [
+        Paragraph("UNIVERSIDAD NACIONAL MAYOR DE SAN MARCOS", style_header_unmsm),
+        Paragraph("(Universidad del Perú, DECANA DE AMÉRICA)", style_header_sub),
+        Spacer(1, 3),
+        Paragraph("DIRECCIÓN GENERAL DE ADMINISTRACIÓN", style_header_dir)
+    ]
 
-    def agregar_seccion_der(titulo, texto, es_lista=False):
-        if not texto: return
-        story_der.append(Paragraph(titulo, style_titulo_der))
-        story_der.append(Spacer(1, 4))
-        story_der.append(LineaDivisoria(ANCHO_LINEA, GUINDA_FACULTAD, 1.5))
-        story_der.append(Spacer(1, 10))
-        
-        if es_lista:
-            elementos = [e.strip() for e in texto.strip().split("\n") if e.strip()]
-            for el in elementos:
-                story_der.append(Paragraph(f"• &nbsp;{sanitizar_para_reportlab(el)}", style_bullet))
-                story_der.append(Spacer(1, 5))
-        else:
-            story_der.append(Paragraph(sanitizar_para_reportlab(texto), style_cuerpo))
-        story_der.append(Spacer(1, 22))
+    t_header = Table([[logo_img or "", text_header]], colWidths=[75, W - 165])
+    t_header.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(t_header)
+    story.append(Spacer(1, 12))
 
-    agregar_seccion_der("Formación Académica", datos.get("formacion", ""), es_lista=True)
-    agregar_seccion_der("Sobre Investigación", datos.get("investigacion", ""))
-    agregar_seccion_der("Trayectoria", datos.get("trayectoria", ""))
-    agregar_seccion_der("Experiencia Laboral", datos.get("experiencia", ""), es_lista=True)
+    # Línea Divisoria Superior
+    t_line = Table([[""]], colWidths=[W - 90], rowHeights=[1.5])
+    t_line.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), NEGRO)]))
+    story.append(t_line)
+    story.append(Spacer(1, 14))
 
-    # 🎛️ Estructura Grid de Doble Columna (Sin forzar rowHeights)
-    grid_principal = Table([[story_izq, story_der]], colWidths=[ANCHO_COL_IZQ, ANCHO_COL_DER])
-    grid_principal.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LEFTPADDING', (0, 0), (0, 0), 18),
-        ('RIGHTPADDING', (0, 0), (0, 0), 18),
-        ('LEFTPADDING', (1, 0), (1, 0), PADDING_DER),
-        ('RIGHTPADDING', (1, 0), (1, 0), PADDING_DER),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    # Título de la Declaración Jurada
+    story.append(Paragraph("DECLARACIÓN JURADA DE NO PERTENECER A LOS ÓRGANOS DE GOBIERNO DE LA UNMSM", style_tit_main))
+    story.append(Spacer(1, 3))
+    story.append(Paragraph("<i>Ley Universitaria<br/>Ley Nº 30220</i>", style_tit_sub))
+    story.append(Spacer(1, 14))
+
+    # Texto introductorio
+    intro_txt = (
+        "En cumplimiento de lo dispuesto en el Art. 104º de la Ley Universitaria – Ley Nº 30220, que señala:<br/>"
+        "<i>“Los representantes de los estudiantes en los órganos de gobierno de la Universidad, están impedidos de tener cargo o actividad rentada en ellas durante su mandato y hasta un año después de terminado éste”.</i>"
+    )
+    story.append(Paragraph(intro_txt, style_body))
+    story.append(Spacer(1, 14))
+
+    # Datos para los campos
+    ap_paterno = datos.get("ap_paterno", "").strip().upper()
+    ap_materno = datos.get("ap_materno", "").strip().upper()
+    apellidos_completos = f"{ap_paterno} {ap_materno}".strip()
+    nombres    = datos.get("nombres", "").strip().upper()
+    dni        = datos.get("dni", "").strip()
+    domicilio  = datos.get("domicilio", "").strip().upper()
+    distrito   = datos.get("distrito", "").strip().upper()
+    telefono   = datos.get("telefono", "").strip()
+    email      = datos.get("email", "").strip()
+    condicion  = datos.get("condicion", "Estudiante").strip()
+    facultad   = datos.get("facultad", "").strip()
+    fecha      = datos.get("fecha", "").strip() or "Lima, 30 de Abril del 2026"
+
+    # Corrección de posible tipeo en fecha
+    if fecha.startswith("Lma"):
+        fecha = fecha.replace("Lma", "Lima")
+
+    # Tabla 1: El que suscribe (Apellidos unidos en caja superior), Nombres y DNI
+    t1_data = [
+        [Paragraph("El que suscribe,", style_body), Paragraph(apellidos_completos, style_cell_txt), ""],
+        ["", Paragraph("(Ap. Paterno)", style_cell_lbl), Paragraph("(Ap. Materno)", style_cell_lbl)],
+        ["", Paragraph(nombres, style_cell_txt), Paragraph(dni, style_cell_txt)],
+        ["", Paragraph("(Nombres Completos)", style_cell_lbl), Paragraph("(Nº Documento Nacional de Identidad – DNI)", style_cell_lbl)]
+    ]
+    t1 = Table(t1_data, colWidths=[105, 230, 170])
+    t1.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('SPAN', (1, 0), (2, 0)),
+        ('BOX', (1, 0), (2, 0), 1, NEGRO),
+        ('BOX', (1, 2), (1, 2), 1, NEGRO),
+        ('BOX', (2, 2), (2, 2), 1, NEGRO),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    story.append(t1)
+    story.append(Spacer(1, 10))
+
+    # Tabla 2: Domicilio y Distrito
+    t2_data = [
+        [Paragraph("Domiciliado en", style_body), Paragraph(domicilio, style_cell_txt), Paragraph(distrito, style_cell_txt)],
+        ["", "", Paragraph("(Distrito)", style_cell_lbl)]
+    ]
+    t2 = Table(t2_data, colWidths=[105, 255, 145])
+    t2.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOX', (1, 0), (1, 0), 1, NEGRO),
+        ('BOX', (2, 0), (2, 0), 1, NEGRO),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    story.append(t2)
+    story.append(Spacer(1, 10))
+
+    # Tabla 3: Teléfono y Email
+    t3_data = [
+        [
+            Paragraph("Con Nº de Teléfono", style_body),
+            Paragraph(telefono, style_cell_txt),
+            Paragraph(f"Email: <u>{email}</u>", ParagraphStyle('Em', fontName='Helvetica', fontSize=9.5))
+        ]
+    ]
+    t3 = Table(t3_data, colWidths=[110, 160, 235])
+    t3.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOX', (1, 0), (1, 0), 1, NEGRO),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    story.append(t3)
+    story.append(Spacer(1, 12))
+
+    # Condición y Facultad
+    story.append(Paragraph(f"En mi condición de: <b>{condicion}</b>", style_body))
+    story.append(Spacer(1, 8))
+    
+    t_fac = Table([[
+        Paragraph("Indicar la Facultad a la que pertenece:", style_body),
+        Paragraph(f"<b>{facultad}</b>", ParagraphStyle('FacVal', fontName='Helvetica-Bold', fontSize=9.5))
+    ]], colWidths=[205, 300])
+    t_fac.setStyle(TableStyle([
+        ('LINEBELOW', (1, 0), (1, 0), 1, NEGRO),
+        ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1)
+    ]))
+    story.append(t_fac)
+    story.append(Spacer(1, 18))
+
+    # Texto Juramento
+    dec_txt = (
+        "<b>Declaro bajo juramento el no pertenecer a los Órganos de Gobierno de la Universidad Nacional Mayor de San Marcos "
+        "y no encontrarme comprendido en los impedimentos del Art. 104º de la Ley Universitaria Nº 30220.</b><br/><br/>"
+        "Asimismo, declaro conocer las consecuencias administrativas, civiles y penales por la falsedad de la información "
+        "proporcionada, previstas en la Ley Nº 27444 y en los códigos civil y penal vigente."
+    )
+    story.append(Paragraph(dec_txt, style_body))
+    story.append(Spacer(1, 30))
+
+    # Fecha y Firma
+    story.append(Paragraph(sanitizar_para_reportlab(fecha), style_body))
+    story.append(Spacer(1, 15))
+
+    firma_img = ""
+    firma_path = datos.get("firma_path")
+    if firma_path and os.path.exists(firma_path):
+        try:
+            firma_img = Image(firma_path, width=150, height=55)
+        except Exception:
+            firma_img = ""
+
+    t_firma_rows = [
+        [firma_img or ""],
+        [""],
+        [Paragraph("FIRMA DEL DECLARANTE", ParagraphStyle('FirmaLabel', fontName='Helvetica', fontSize=9, alignment=1))]
+    ]
+    t_firma = Table(t_firma_rows, colWidths=[210], rowHeights=[55, 2, 16])
+    t_firma.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('LINEBELOW', (0, 1), (0, 1), 1, NEGRO),
     ]))
 
-    # Compilamos inyectando el fondo a través del parámetro onFirstPage
-    doc.build([grid_principal], onFirstPage=dibujar_fondos_cv)
+    t_pie = Table([["", t_firma]], colWidths=[W - 300, 210])
+    story.append(t_pie)
+
+    doc.build(story)
+    return ruta_salida
+
+
+# ── 2. GENERADOR: INFORME DE ACTIVIDADES ────────────────────────────────────
+def generar_informe_actividades(datos: dict, ruta_salida: str) -> str:
+    """Genera el PDF del Informe de Actividades del Bolsista."""
+    doc = SimpleDocTemplate(
+        ruta_salida, pagesize=A4,
+        leftMargin=50, rightMargin=50, topMargin=45, bottomMargin=45
+    )
+    
+    styles = getSampleStyleSheet()
+
+    style_title = ParagraphStyle('InfTitle', fontName='Helvetica-Bold', fontSize=14, leading=18, alignment=1)
+    style_label = ParagraphStyle('InfLab', fontName='Helvetica-Bold', fontSize=10.5, leading=15)
+    style_val   = ParagraphStyle('InfVal', fontName='Helvetica', fontSize=10.5, leading=15)
+    style_body  = ParagraphStyle('InfBody', fontName='Helvetica', fontSize=10.5, leading=15, alignment=4)
+    style_bullet= ParagraphStyle('InfBullet', fontName='Helvetica-Bold', fontSize=10.5, leading=15, leftIndent=20)
+
+    story = []
+
+    anio = datos.get("anio", "2026")
+    story.append(Paragraph(f"INFORME DE ACTIVIDADES - {anio}", style_title))
+    story.append(Spacer(1, 20))
+
+    para_nom = datos.get("para_nombre", "").upper()
+    para_car = datos.get("para_cargo", "")
+    de_nom   = datos.get("de_nombre", "").upper()
+    asunto   = datos.get("asunto", "Informe de actividades")
+    fecha    = datos.get("fecha", "Lima, 30 de Abril de 2026")
+
+    header_table_data = [
+        [Paragraph("A:", style_label), Paragraph(f"<b>{para_nom}</b><br/>{para_car}", style_val)],
+        ["", ""],
+        [Paragraph("De:", style_label), Paragraph(f"<b>{de_nom}</b>", style_val)],
+        ["", ""],
+        [Paragraph("Asunto:", style_label), Paragraph(asunto, style_val)],
+        ["", ""],
+        [Paragraph("Fecha:", style_label), Paragraph(fecha, style_val)],
+    ]
+    t_header = Table(header_table_data, colWidths=[60, W - 160])
+    t_header.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    story.append(t_header)
+    story.append(Spacer(1, 15))
+
+    t_line = Table([[""]], colWidths=[W - 100], rowHeights=[1])
+    t_line.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#A0A0A0"))]))
+    story.append(t_line)
+    story.append(Spacer(1, 18))
+
+    fecha_ini = datos.get("fecha_inicio", "01 de Abril")
+    intro_txt = f"Tengo el agrado de dirigirme a usted, a fin de informarle sobre el desarrollo del servicio realizado a partir del día {fecha_ini} del presente año, tal como se señala a continuación."
+    story.append(Paragraph(intro_txt, style_body))
+    story.append(Spacer(1, 15))
+
+    actividades = datos.get("actividades", [])
+    if isinstance(actividades, str):
+        actividades = [a.strip() for a in actividades.split("\n") if a.strip()]
+
+    for act in actividades:
+        story.append(Paragraph(f"➢ &nbsp; {sanitizar_para_reportlab(act)}", style_bullet))
+        story.append(Spacer(1, 8))
+
+    story.append(Spacer(1, 15))
+    story.append(Paragraph("Asimismo, se adjuntan evidencias de la labor realizada.", style_body))
+    story.append(Spacer(1, 25))
+
+    evidencias = datos.get("evidencias", [])
+    if evidencias:
+        story.append(PageBreak())
+        story.append(Paragraph("<b>EVIDENCIAS FOTOGRÁFICAS DE LAS ACTIVIDADES</b>", ParagraphStyle('EvTitle', fontName='Helvetica-Bold', fontSize=12, alignment=1)))
+        story.append(Spacer(1, 15))
+
+        img_cells = []
+        for ev in evidencias:
+            img_path = ev if isinstance(ev, str) else ev.get("path")
+            if img_path and os.path.exists(img_path):
+                try:
+                    img_obj = Image(img_path, width=220, height=160)
+                    img_cells.append(img_obj)
+                except Exception:
+                    pass
+
+        grid_rows = []
+        for i in range(0, len(img_cells), 2):
+            row = [img_cells[i]]
+            if i + 1 < len(img_cells):
+                row.append(img_cells[i+1])
+            else:
+                row.append("")
+            grid_rows.append(row)
+
+        if grid_rows:
+            t_grid = Table(grid_rows, colWidths=[240, 240])
+            t_grid.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+            ]))
+            story.append(t_grid)
+            story.append(Spacer(1, 20))
+
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("Es todo cuanto tengo que informar", style_body))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph("Atentamente", style_body))
+    story.append(Spacer(1, 20))
+
+    firma_img = ""
+    firma_path = datos.get("firma_path")
+    if firma_path and os.path.exists(firma_path):
+        try:
+            firma_img = Image(firma_path, width=160, height=60)
+        except Exception:
+            firma_img = ""
+
+    t_firma_rows = [
+        [firma_img or ""],
+        [""],
+        [Paragraph(f"<b>{de_nom}</b>", ParagraphStyle('FN', fontName='Helvetica-Bold', fontSize=10, alignment=1))],
+        [Paragraph(f"DNI: {datos.get('dni', '')}", ParagraphStyle('FD', fontName='Helvetica', fontSize=9.5, alignment=1))]
+    ]
+    t_firma = Table(t_firma_rows, colWidths=[220], rowHeights=[60, 2, 16, 14])
+    t_firma.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('LINEBELOW', (0, 1), (0, 1), 1, NEGRO),
+    ]))
+
+    t_pie_inf = Table([["", t_firma]], colWidths=[W - 320, 220])
+    story.append(t_pie_inf)
+
+    doc.build(story)
     return ruta_salida

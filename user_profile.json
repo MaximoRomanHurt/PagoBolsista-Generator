@@ -1,14 +1,14 @@
 {
-  "ap_paterno": "Roman",
-  "ap_materno": "Hurtado",
-  "nombres": "Maximo Lenny",
-  "dni": "72626630",
-  "domicilio": "BQ MARCAVALLE BLOQUE Q AAVV MARCAVALLE",
-  "distrito": "SANTA ROSA DE SACCO",
-  "telefono": "910454394",
-  "email": "maximo.roman@unmsm.edu.pe",
-  "facultad": "Facultad de Ingenieria de Sistemas e Informatica",
+  "ap_paterno": "",
+  "ap_materno": "",
+  "nombres": " ",
+  "dni": "",
+  "domicilio": "   ",
+  "distrito": "   ",
+  "telefono": "",
+  "email": "",
+  "facultad": "",
   "fecha": "Lima 26 de Julio del 2026",
-  "condicion": "Estudiante",
-  "firma_path": "C:/Users/usuario/Pictures/firma.png"
+  "condicion": "",
+  "firma_path": " "
 }

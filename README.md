@@ -25,13 +25,25 @@ Esta aplicación simplifica el proceso ofreciendo un menú interactivo para eleg
 
 ---
 
-## ⚠️ Estado y Errores Conocidos (Bugs)
+## ✨ Características Destacadas y Novedades
 
-> [!WARNING]
-> **Bug en Reporte de Asistencias (Estampado de Firmas):**
-> Existe un detalle en desarrollo con el estampado automático de firmas sobre el reporte de asistencias. Dependiendo de la estructura o disposición del archivo `.docx` / `.pdf` provisto por cada facultad, la posición de las firmas puede requerir alineación fina manual o requerir MS Word instalado en Windows para la conversión precisa a PDF.
+> [!NOTE]
+> **Detección Dinámica de Firmas en Reporte de Asistencias (Visión por Computadora):**
+> El sistema incluye un motor basado en **Visión por Computadora (OpenCV) y Extracción de Tablas (PyMuPDF)** que detecta automáticamente las celdas de la columna "FIRMA" sin importar la cantidad variable de días/filas ni el formato del PDF de cada facultad. Las firmas se estampan perfectamente centradas en cada celda sin modificar las dimensiones del documento ni pisar los textos de resumen del pie de página.
 
 ---
+
+## 🛠️ Errores Resueltos y Correcciones (Bug Fixes)
+
+> [!TIP]
+> **Bug de Estampado y Desborde de Firmas en Asistencias (RESUELTO ✅):**
+> - **Problema previo:** Las firmas se colocaban usando posiciones y cantidad de filas estáticas (12 filas fijas), lo que provocaba que se desalinearan, se saltaran la primera fila y se desbordaran estampándose sobre las notas de resumen al pie del reporte (`Total a pagar`, `Precio por turno`, etc.).
+> - **Solución implementada:** Se reestructuró `src/docx_handler.py` añadiendo delimitación estricta de bordes de tabla y centrado geométrico inteligente. Ahora se identifican únicamente las filas reales de datos, omitiendo automáticamente las celdas de pie de página/totales y centrando la firma en cada recuadro.
+> - **Estado:** Totalmente corregido y funcional para cualquier plantilla `.pdf` o `.docx`.
+
+---
+
+
 
 ## 🖥️ Flujo de Uso
 

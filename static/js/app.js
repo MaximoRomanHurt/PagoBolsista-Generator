@@ -249,7 +249,15 @@
         try {
           const errData = await respuesta.json();
           if (errData && errData.detail) {
-            msjError = errData.detail;
+            if (typeof errData.detail === "string") {
+              msjError = errData.detail;
+            } else if (Array.isArray(errData.detail)) {
+              msjError = errData.detail
+                .map((d) => (d.loc ? `${d.loc[d.loc.length - 1]}: ` : "") + d.msg)
+                .join(" | ");
+            } else {
+              msjError = JSON.stringify(errData.detail);
+            }
           }
         } catch (_) {}
         throw new Error(msjError);
@@ -269,11 +277,20 @@
    * 7. LISTENERS DE FORMULARIOS → ENDPOINTS DE LA API
    * ============================================================ */
 
+  function validarFormulario(form) {
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return false;
+    }
+    return true;
+  }
+
   // --- Declaración Jurada ---
   const formDeclaracion = document.getElementById("form-declaracion");
   if (formDeclaracion) {
     formDeclaracion.addEventListener("submit", (e) => {
       e.preventDefault();
+      if (!validarFormulario(e.target)) return;
       guardarPerfilDesdeFormulario(e.target);
       enviarFormulario("/api/declaracion-jurada", new FormData(e.target), "declaracion_jurada.pdf");
     });
@@ -284,6 +301,7 @@
   if (formAsistencia) {
     formAsistencia.addEventListener("submit", (e) => {
       e.preventDefault();
+      if (!validarFormulario(e.target)) return;
       enviarFormulario("/api/reporte-asistencia", new FormData(e.target), "reporte_asistencia_firmado.pdf");
     });
   }
@@ -293,6 +311,7 @@
   if (formInforme) {
     formInforme.addEventListener("submit", (e) => {
       e.preventDefault();
+      if (!validarFormulario(e.target)) return;
       const formData = new FormData(e.target);
 
       // Actividades: una por línea (compatible con pdf_generator.py que hace split("\n"))

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="{{ meta_description | default('Genera y firma los documentos requeridos para el cobro de bolsistas UNMSM.') }}">
+  <title>{% block title %}UNMSM · Mesa de Trámites — Bolsistas{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+
+<!-- ===== Barra superior institucional ===== -->
+<div class="topbar">
+  <svg class="escudo" viewBox="0 0 42 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M21 1 L40 8 V24 C40 36 32 43 21 47 C10 43 2 36 2 24 V8 Z" fill="#F3E9D8" stroke="#AD7F2A" stroke-width="1.6"/>
+    <path d="M21 6 L35 11 V24 C35 33 29 38 21 41 C13 38 7 33 7 24 V11 Z" fill="#7A1230"/>
+    <text x="21" y="27" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="600" fill="#F3E9D8">UNMSM</text>
+  </svg>
+  <div class="topbar-text">
+    <span class="topbar-title">Universidad Nacional Mayor de San Marcos</span>
+    <span class="topbar-sub">Mesa de Trámites · Bolsistas</span>
+  </div>
+  <button class="topbar-back" id="btnVolver" hidden type="button">
+    <span aria-hidden="true">←</span> Volver al inicio
+  </button>
+</div>
+
+<!-- ===== Contenido dinámico de cada página ===== -->
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ===== Overlay: sello de procesamiento (compartido por todas las pantallas) ===== -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlay-titulo">
+  <div class="overlay-panel">
+    <div id="overlay-spinner" class="spinner"></div>
+
+    <div class="sello" id="sello" aria-hidden="true">
+      <svg viewBox="0 0 130 130">
+        <defs>
+          <path id="curvaTexto" d="M 15,65 A 50,50 0 1 1 115,65" fill="none"/>
+        </defs>
+        <circle cx="65" cy="65" r="60" fill="none" stroke="#7A1230" stroke-width="2.5"/>
+        <circle cx="65" cy="65" r="52" fill="none" stroke="#7A1230" stroke-width="1"/>
+        <text font-family="IBM Plex Mono, monospace" font-size="7.2" fill="#7A1230" letter-spacing="1.5">
+          <textPath href="#curvaTexto" startOffset="2">UNIVERSIDAD NACIONAL MAYOR DE SAN MARCOS</textPath>
+        </text>
+        <text x="65" y="60" text-anchor="middle" font-family="Fraunces, serif" font-weight="700" font-size="15" fill="#7A1230">PROCESADO</text>
+        <text x="65" y="76" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#7A1230" id="sello-fecha">--/--/----</text>
+      </svg>
+    </div>
+
+    <p class="overlay-estado" id="overlay-estado">Generando documento…</p>
+    <h3 id="overlay-titulo">Sellando tu expediente</h3>
+    <p id="overlay-desc">Esto toma solo unos segundos.</p>
+
+    <button class="btn-descargar" id="btn-descargar" type="button">
+      <span aria-hidden="true">⬇</span> Descargar PDF firmado
+    </button>
+    <button class="btn-cerrar-overlay" id="btn-cerrar-overlay" type="button">Cerrar y volver al inicio</button>
+  </div>
+</div>
+
+<!-- Región para anuncios de accesibilidad (screen readers) -->
+<span class="visually-hidden" id="anuncios" aria-live="polite"></span>
+
+<script src="{{ url_for('static', path='js/app.js') }}"></script>
+{% block scripts_extra %}{% endblock %}
+
+</body>
+</html>

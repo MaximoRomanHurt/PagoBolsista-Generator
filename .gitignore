@@ -1,7 +1,35 @@
+# Virtual Environments
 venv/
+venv_web/
+venv*/
+env/
+ENV/
+
+# Python Bytecode & Cache
 __pycache__/
 *.pyc
-*.pdf
-output/
+*.pyo
+*.pyd
+.pytest_cache/
 *.egg-info/
+.workspace/
+
+# Documentos generados y pruebas
+output/
+*.pdf
+test/logs/
+test/*.pdf
+test/muestras/
+
+# Persistencia local de usuario
+user_profile.json
+
+# Entorno y credenciales
 .env
+*.env
+
+# IDEs y Sistema Operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

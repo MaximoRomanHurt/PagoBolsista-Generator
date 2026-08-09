@@ -1,0 +1,14 @@
+# === Dependencias para la versión de ESCRITORIO (Windows) ===
+customtkinter>=5.2.0
+reportlab>=4.0.0
+Pillow>=10.0.0
+python-docx>=0.8.11
+pypdf>=3.0.0
+pyinstaller>=6.0.0
+opencv-python>=4.8.0
+PyMuPDF>=1.23.0
+numpy>=1.24.0
+
+# Conversión DOCX -> PDF en Windows (requiere MS Word instalado)
+pywin32>=306; sys_platform == "win32"
+docx2pdf>=0.1.8; sys_platform == "win32"

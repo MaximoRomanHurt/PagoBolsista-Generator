@@ -6,6 +6,9 @@ Generador de PDFs en ReportLab para los documentos de Bolsistas UNMSM:
 """
 
 import os
+import io
+import tempfile
+from PIL import Image as PILImage
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import (
@@ -18,6 +21,73 @@ from ui.utils import sanitizar_para_reportlab
 W, H = A4
 NEGRO = colors.HexColor("#000000")
 
+# Carpeta temporal donde se guardan las versiones comprimidas de las imágenes
+# antes de incrustarlas en el PDF. Se limpia sola al terminar cada generación.
+_TEMP_IMG_DIR = os.path.join(tempfile.gettempdir(), "bolsista_img_cache")
+
+
+def _comprimir_imagen_para_pdf(ruta_original: str, ancho_max_px: int = 1000, calidad: int = 82) -> str:
+    """
+    Redimensiona y comprime una imagen ANTES de insertarla en el PDF.
+
+    Por qué es necesario: reportlab.platypus.Image(path, width=X, height=Y)
+    NO redimensiona el archivo real -- esos parámetros solo controlan el
+    tamaño visual dentro del PDF. Internamente, reportlab incrusta la imagen
+    en su resolución ORIGINAL completa. Si el usuario sube una foto de
+    celular sin comprimir (4000x3000px, varios MB), esa resolución completa
+    queda embebida en memoria y en el PDF final, aunque se vea chica en pantalla.
+
+    Esta función genera una copia temporal ya redimensionada (ancho_max_px)
+    y comprimida (JPEG calidad ~82), que es la que se le pasa a reportlab.
+    Esto evita picos de RAM innecesarios y además deja el PDF final mucho
+    más liviano para descargar.
+
+    Devuelve la ruta a la imagen temporal comprimida. Si algo falla,
+    devuelve la ruta original tal cual (fallback seguro, nunca rompe el flujo).
+    """
+    try:
+        os.makedirs(_TEMP_IMG_DIR, exist_ok=True)
+
+        with PILImage.open(ruta_original) as img:
+            # Normalizar a RGB (evita problemas con PNG con transparencia al guardar como JPEG)
+            if img.mode in ("RGBA", "P", "LA"):
+                fondo = PILImage.new("RGB", img.size, (255, 255, 255))
+                img_rgb = img.convert("RGBA")
+                fondo.paste(img_rgb, mask=img_rgb.split()[-1])
+                img = fondo
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # Redimensionar solo si excede el ancho máximo (no agranda imágenes chicas)
+            if img.width > ancho_max_px:
+                ratio = ancho_max_px / float(img.width)
+                nuevo_alto = int(img.height * ratio)
+                img = img.resize((ancho_max_px, nuevo_alto), PILImage.LANCZOS)
+
+            nombre_temp = f"tmp_{os.getpid()}_{abs(hash(ruta_original))}.jpg"
+            ruta_temp = os.path.join(_TEMP_IMG_DIR, nombre_temp)
+            img.save(ruta_temp, format="JPEG", quality=calidad, optimize=True)
+
+            return ruta_temp
+
+    except Exception:
+        # Si algo sale mal comprimiendo, seguimos con la imagen original
+        # en vez de romper la generación del documento.
+        return ruta_original
+
+
+def _limpiar_temporales_imagenes():
+    """Borra las imágenes temporales comprimidas generadas en esta ejecución."""
+    if not os.path.isdir(_TEMP_IMG_DIR):
+        return
+    prefijo = f"tmp_{os.getpid()}_"
+    for nombre in os.listdir(_TEMP_IMG_DIR):
+        if nombre.startswith(prefijo):
+            try:
+                os.remove(os.path.join(_TEMP_IMG_DIR, nombre))
+            except Exception:
+                pass
+
 
 # ── 1. GENERADOR: DECLARACIÓN JURADA (Diseño idéntico al oficial UNMSM) ──────
 def generar_declaracion_jurada(datos: dict, ruta_salida: str, logo_path: str = None) -> str:
@@ -26,16 +96,16 @@ def generar_declaracion_jurada(datos: dict, ruta_salida: str, logo_path: str = N
         ruta_salida, pagesize=A4,
         leftMargin=45, rightMargin=45, topMargin=40, bottomMargin=40
     )
-    
+
     styles = getSampleStyleSheet()
-    
+
     style_header_unmsm = ParagraphStyle('HeadUNMSM', fontName='Helvetica-Bold', fontSize=13, leading=16, alignment=1)
     style_header_sub   = ParagraphStyle('HeadSub', fontName='Helvetica', fontSize=10.5, leading=13, alignment=1)
     style_header_dir   = ParagraphStyle('HeadDir', fontName='Helvetica-Bold', fontSize=11.5, leading=14, alignment=1)
-    
+
     style_tit_main = ParagraphStyle('TitMain', fontName='Helvetica-Bold', fontSize=11, leading=14, alignment=1)
     style_tit_sub  = ParagraphStyle('TitSub', fontName='Helvetica-Oblique', fontSize=9.5, leading=12, alignment=1)
-    
+
     style_body      = ParagraphStyle('BodyText', fontName='Helvetica', fontSize=9.5, leading=13.5, alignment=4)
     style_cell_txt  = ParagraphStyle('CellTxt', fontName='Helvetica', fontSize=9.5, leading=12, alignment=1)
     style_cell_lbl  = ParagraphStyle('CellLbl', fontName='Helvetica', fontSize=8, leading=10, alignment=1)
@@ -46,10 +116,11 @@ def generar_declaracion_jurada(datos: dict, ruta_salida: str, logo_path: str = N
     logo_img = None
     if logo_path and os.path.exists(logo_path):
         try:
-            logo_img = Image(logo_path, width=65, height=70)
+            logo_comprimido = _comprimir_imagen_para_pdf(logo_path, ancho_max_px=300)
+            logo_img = Image(logo_comprimido, width=65, height=70)
         except Exception:
             logo_img = ""
-    
+
     text_header = [
         Paragraph("UNIVERSIDAD NACIONAL MAYOR DE SAN MARCOS", style_header_unmsm),
         Paragraph("(Universidad del Perú, DECANA DE AMÉRICA)", style_header_sub),
@@ -162,7 +233,7 @@ def generar_declaracion_jurada(datos: dict, ruta_salida: str, logo_path: str = N
     # Condición y Facultad
     story.append(Paragraph(f"En mi condición de: <b>{condicion}</b>", style_body))
     story.append(Spacer(1, 8))
-    
+
     t_fac = Table([[
         Paragraph("Indicar la Facultad a la que pertenece:", style_body),
         Paragraph(f"<b>{facultad}</b>", ParagraphStyle('FacVal', fontName='Helvetica-Bold', fontSize=9.5))
@@ -193,7 +264,8 @@ def generar_declaracion_jurada(datos: dict, ruta_salida: str, logo_path: str = N
     firma_path = datos.get("firma_path")
     if firma_path and os.path.exists(firma_path):
         try:
-            firma_img = Image(firma_path, width=150, height=55)
+            firma_comprimida = _comprimir_imagen_para_pdf(firma_path, ancho_max_px=500)
+            firma_img = Image(firma_comprimida, width=150, height=55)
         except Exception:
             firma_img = ""
 
@@ -212,6 +284,7 @@ def generar_declaracion_jurada(datos: dict, ruta_salida: str, logo_path: str = N
     story.append(t_pie)
 
     doc.build(story)
+    _limpiar_temporales_imagenes()
     return ruta_salida
 
 
@@ -222,7 +295,7 @@ def generar_informe_actividades(datos: dict, ruta_salida: str) -> str:
         ruta_salida, pagesize=A4,
         leftMargin=50, rightMargin=50, topMargin=45, bottomMargin=45
     )
-    
+
     styles = getSampleStyleSheet()
 
     style_title = ParagraphStyle('InfTitle', fontName='Helvetica-Bold', fontSize=14, leading=18, alignment=1)
@@ -294,7 +367,11 @@ def generar_informe_actividades(datos: dict, ruta_salida: str) -> str:
             img_path = ev if isinstance(ev, str) else ev.get("path")
             if img_path and os.path.exists(img_path):
                 try:
-                    img_obj = Image(img_path, width=220, height=160)
+                    # Comprimimos ANTES de pasarla a reportlab. El ancho visual
+                    # en el PDF sigue siendo 220px (colWidths), pero ahora la
+                    # imagen real que se incrusta ya viene liviana.
+                    img_comprimida = _comprimir_imagen_para_pdf(img_path, ancho_max_px=900)
+                    img_obj = Image(img_comprimida, width=220, height=160)
                     img_cells.append(img_obj)
                 except Exception:
                     pass
@@ -328,7 +405,8 @@ def generar_informe_actividades(datos: dict, ruta_salida: str) -> str:
     firma_path = datos.get("firma_path")
     if firma_path and os.path.exists(firma_path):
         try:
-            firma_img = Image(firma_path, width=160, height=60)
+            firma_comprimida = _comprimir_imagen_para_pdf(firma_path, ancho_max_px=500)
+            firma_img = Image(firma_comprimida, width=160, height=60)
         except Exception:
             firma_img = ""
 
@@ -348,4 +426,5 @@ def generar_informe_actividades(datos: dict, ruta_salida: str) -> str:
     story.append(t_pie_inf)
 
     doc.build(story)
+    _limpiar_temporales_imagenes()
     return ruta_salida

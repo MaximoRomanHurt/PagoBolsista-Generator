@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}UNMSM · Mesa de Trámites — Bolsistas{% endblock %}
+
+{% block content %}
+
+  <!-- ===================== PANTALLA: SELECCIÓN ===================== -->
+  <section class="screen active" id="screen-inicio">
+    <div class="intro">
+      <span class="intro-eyebrow">Trámite mensual · 3 documentos requeridos</span>
+      <h1>¿Qué documento necesitas generar?</h1>
+      <p>Selecciona el expediente correspondiente. Cada uno se sella y descarga como PDF listo para presentar en tu trámite de pago.</p>
+    </div>
+
+    <div class="folios-grid">
+      <button class="folio-card" data-target="declaracion" type="button">
+        <span class="folio-num">FOLIO 01</span>
+        <h2>Declaración Jurada</h2>
+        <p class="desc">De no pertenecer a los Órganos de Gobierno de la UNMSM. Art. 104º, Ley Nº 30220.</p>
+        <span class="tag">Formulario + firma</span>
+      </button>
+
+      <button class="folio-card" data-target="asistencia" type="button">
+        <span class="folio-num">FOLIO 02</span>
+        <h2>Reporte de Asistencia</h2>
+        <p class="desc">Sube el documento emitido por tu facultad y estampa tu firma sobre la tabla de asistencias.</p>
+        <span class="tag">Archivo .docx / .pdf + firma</span>
+      </button>
+
+      <button class="folio-card" data-target="informe" type="button">
+        <span class="folio-num">FOLIO 03</span>
+        <h2>Informe de Actividades</h2>
+        <p class="desc">Detalla las labores del mes y adjunta hasta 20 fotos como evidencia.</p>
+        <span class="tag">Formulario + evidencias + firma</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: DECLARACIÓN JURADA ===================== -->
+  <section class="screen" id="screen-declaracion">
+    <div class="expediente">
+      <div class="expediente-head">
+        <div>
+          <h2>Declaración Jurada</h2>
+          <p class="subt">No pertenecer a los Órganos de Gobierno — Ley Nº 30220, Art. 104º</p>
+        </div>
+        <div class="folio-tag">
+          <span>Folio Nº</span>
+          <span class="num folio" data-folio="declaracion">—</span>
+        </div>
+      </div>
+
+      <form class="expediente-body" id="form-declaracion" novalidate>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Datos del declarante</div>
+          <div class="grid-2">
+            <div class="campo">
+              <label for="dj-ap-paterno">Apellido paterno <span class="req">*</span></label>
+              <input type="text" id="dj-ap-paterno" name="ap_paterno" required autocomplete="family-name">
+            </div>
+            <div class="campo">
+              <label for="dj-ap-materno">Apellido materno <span class="req">*</span></label>
+              <input type="text" id="dj-ap-materno" name="ap_materno" required>
+            </div>
+            <div class="campo">
+              <label for="dj-nombres">Nombres <span class="req">*</span></label>
+              <input type="text" id="dj-nombres" name="nombres" required autocomplete="given-name">
+            </div>
+            <div class="campo">
+              <label for="dj-dni">DNI <span class="req">*</span></label>
+              <input type="text" id="dj-dni" name="dni" required inputmode="numeric" maxlength="8" pattern="[0-9]{8}" style="font-family:'IBM Plex Mono', monospace">
+            </div>
+          </div>
+        </div>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Domicilio y contacto</div>
+          <div class="grid-2">
+            <div class="campo">
+              <label for="dj-domicilio">Domicilio <span class="req">*</span></label>
+              <input type="text" id="dj-domicilio" name="domicilio" required autocomplete="street-address">
+            </div>
+            <div class="campo">
+              <label for="dj-distrito">Distrito <span class="req">*</span></label>
+              <input type="text" id="dj-distrito" name="distrito" required>
+            </div>
+            <div class="campo">
+              <label for="dj-telefono">Teléfono</label>
+              <input type="tel" id="dj-telefono" name="telefono" autocomplete="tel">
+            </div>
+            <div class="campo">
+              <label for="dj-email">Correo electrónico <span class="req">*</span></label>
+              <input type="email" id="dj-email" name="email" required autocomplete="email">
+            </div>
+          </div>
+        </div>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Condición académica</div>
+          <div class="grid-2">
+            <div class="campo">
+              <label for="dj-condicion">Condición <span class="req">*</span></label>
+              <select id="dj-condicion" name="condicion" required>
+                <option value="Estudiante">Estudiante</option>
+                <option value="Egresado">Egresado</option>
+                <option value="Bachiller">Bachiller</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="dj-facultad">Facultad <span class="req">*</span></label>
+              <input type="text" id="dj-facultad" name="facultad" required placeholder="Ej. Facultad de Ingeniería de Sistemas">
+            </div>
+            <div class="campo">
+              <label for="dj-fecha">Fecha del trámite <span class="req">*</span></label>
+              <input type="date" id="dj-fecha" name="fecha" required>
+            </div>
+          </div>
+        </div>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Firma</div>
+          <label class="dropzone" for="dj-firma">
+            <span class="dropzone-icon" aria-hidden="true">✒</span>
+            <span class="dropzone-text">
+              <b>Sube una foto de tu firma</b><br>
+              Formatos JPG o PNG
+              <span class="filename" data-filename-for="dj-firma"></span>
+            </span>
+            <input type="file" id="dj-firma" name="firma" accept="image/*" required>
+          </label>
+          <img class="preview-firma" id="dj-firma-preview" alt="Vista previa de la firma">
+        </div>
+
+      </form>
+
+      <div class="expediente-foot">
+        <p class="nota">Al sellar, se genera un PDF con formato oficial UNMSM listo para presentar.</p>
+        <button class="btn-sellar" type="submit" form="form-declaracion">
+          <span aria-hidden="true">◆</span> Sellar y generar documento
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: REPORTE DE ASISTENCIA ===================== -->
+  <section class="screen" id="screen-asistencia">
+    <div class="expediente">
+      <div class="expediente-head">
+        <div>
+          <h2>Reporte de Asistencia</h2>
+          <p class="subt">Estampado de firma sobre el documento emitido por tu facultad</p>
+        </div>
+        <div class="folio-tag">
+          <span>Folio Nº</span>
+          <span class="num folio" data-folio="asistencia">—</span>
+        </div>
+      </div>
+
+      <form class="expediente-body" id="form-asistencia" novalidate>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Documento de asistencia</div>
+          <label class="dropzone" for="ra-documento">
+            <span class="dropzone-icon" aria-hidden="true">⎙</span>
+            <span class="dropzone-text">
+              <b>Sube el reporte de tu facultad</b><br>
+              Formatos DOCX o PDF
+              <span class="filename" data-filename-for="ra-documento"></span>
+            </span>
+            <input type="file" id="ra-documento" name="documento" accept=".docx,.pdf" required>
+          </label>
+          <p class="campo hint" style="margin-top:8px;">La firma se ubica automáticamente sobre la columna "FIRMA" de la tabla, sin alterar el resto del documento.</p>
+        </div>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Firma</div>
+          <label class="dropzone" for="ra-firma">
+            <span class="dropzone-icon" aria-hidden="true">✒</span>
+            <span class="dropzone-text">
+              <b>Sube una foto de tu firma</b><br>
+              Formatos JPG o PNG
+              <span class="filename" data-filename-for="ra-firma"></span>
+            </span>
+            <input type="file" id="ra-firma" name="firma" accept="image/*" required>
+          </label>
+          <img class="preview-firma" id="ra-firma-preview" alt="Vista previa de la firma">
+        </div>
+
+      </form>
+
+      <div class="expediente-foot">
+        <p class="nota">El documento se procesa y se descarga siempre en formato PDF firmado.</p>
+        <button class="btn-sellar" type="submit" form="form-asistencia">
+          <span aria-hidden="true">◆</span> Estampar y generar PDF
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: INFORME DE ACTIVIDADES ===================== -->
+  <section class="screen" id="screen-informe">
+    <div class="expediente">
+      <div class="expediente-head">
+        <div>
+          <h2>Informe de Actividades</h2>
+          <p class="subt">Detalle de labores del mes con evidencia fotográfica</p>
+        </div>
+        <div class="folio-tag">
+          <span>Folio Nº</span>
+          <span class="num folio" data-folio="informe">—</span>
+        </div>
+      </div>
+
+      <form class="expediente-body" id="form-informe" novalidate>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Destinatario</div>
+          <div class="grid-2">
+            <div class="campo">
+              <label for="inf-para-nombre">Dirigido a <span class="req">*</span></label>
+              <input type="text" id="inf-para-nombre" name="para_nombre" required placeholder="Ej. Oficina de Personal">
+            </div>
+            <div class="campo">
+              <label for="inf-para-cargo">Cargo del destinatario</label>
+              <input type="text" id="inf-para-cargo" name="para_cargo" placeholder="Ej. Jefe de la Oficina de Personal">
+            </div>
+            <div class="campo">
+              <label for="inf-de-nombre">Tu nombre completo <span class="req">*</span></label>
+              <input type="text" id="inf-de-nombre" name="de_nombre" required>
+            </div>
+            <div class="campo">
+              <label for="inf-dni">DNI <span class="req">*</span></label>
+              <input type="text" id="inf-dni" name="dni" required inputmode="numeric" maxlength="8" style="font-family:'IBM Plex Mono', monospace">
+            </div>
+            <div class="campo">
+              <label for="inf-fecha-inicio">Inicio del periodo <span class="req">*</span></label>
+              <input type="text" id="inf-fecha-inicio" name="fecha_inicio" required placeholder="Ej. 01 de Agosto">
+            </div>
+            <div class="campo">
+              <label for="inf-fecha">Fecha del informe <span class="req">*</span></label>
+              <input type="date" id="inf-fecha" name="fecha" required>
+            </div>
+          </div>
+        </div>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Actividades realizadas</div>
+          <div id="lista-actividades"></div>
+          <button class="btn-agregar" type="button" id="btn-agregar-actividad">
+            <span aria-hidden="true">+</span> Agregar actividad
+          </button>
+        </div>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Evidencias fotográficas</div>
+          <label class="dropzone" for="inf-evidencias">
+            <span class="dropzone-icon" aria-hidden="true">▤</span>
+            <span class="dropzone-text">
+              <b>Sube tus fotos de evidencia</b><br>
+              Hasta 20 imágenes · se comprimen automáticamente al generar el PDF
+            </span>
+            <input type="file" id="inf-evidencias" name="evidencias" accept="image/*" multiple>
+          </label>
+          <div class="galeria" id="galeria-evidencias" aria-live="polite"></div>
+          <p class="contador-fotos" id="contador-fotos">0 de 20 fotos seleccionadas</p>
+        </div>
+
+        <div class="seccion">
+          <div class="seccion-titulo">Firma</div>
+          <label class="dropzone" for="inf-firma">
+            <span class="dropzone-icon" aria-hidden="true">✒</span>
+            <span class="dropzone-text">
+              <b>Sube una foto de tu firma</b><br>
+              Formatos JPG o PNG
+              <span class="filename" data-filename-for="inf-firma"></span>
+            </span>
+            <input type="file" id="inf-firma" name="firma" accept="image/*" required>
+          </label>
+          <img class="preview-firma" id="inf-firma-preview" alt="Vista previa de la firma">
+        </div>
+
+      </form>
+
+      <div class="expediente-foot">
+        <p class="nota">Se genera un PDF de 2 o más páginas con tus actividades y evidencias adjuntas.</p>
+        <button class="btn-sellar" type="submit" form="form-informe">
+          <span aria-hidden="true">◆</span> Sellar y generar documento
+        </button>
+      </div>
+    </div>
+  </section>
+
+{% endblock %}

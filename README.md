@@ -1,6 +1,6 @@
 # 🎓 Generador de Documentos de Pago para Bolsistas — UNMSM
 
-Sistema de escritorio para generar y firmar los **3 documentos requeridos para el cobro de bolsistas** en la Universidad Nacional Mayor de San Marcos (UNMSM).
+Sistema de escritorio (con migración a web en curso) para generar y firmar los **3 documentos requeridos para el cobro de bolsistas** en la Universidad Nacional Mayor de San Marcos (UNMSM).
 
 ---
 
@@ -60,9 +60,9 @@ Esta aplicación simplifica el proceso ofreciendo un menú interactivo para eleg
 ## 📁 Estructura del Proyecto
 
 ```
-cv_generator/
+PagoBolsista-Generator/
 ├── src/
-│   ├── main.py                     # Punto de entrada y navegación GUI
+│   ├── main.py                     # Punto de entrada y navegación GUI (CustomTkinter)
 │   ├── pdf_generator.py            # Generador ReportLab para Decl. Jurada e Informe
 │   ├── docx_handler.py             # Estampador de firmas en DOCX y PDF de asistencias
 │   ├── user_profile.py             # Gestor de persistencia de datos (Autollenado)
@@ -77,6 +77,7 @@ cv_generator/
 │       └── view_informe.py         # Vista de Informe de Actividades
 ├── assets/                         # Escudos y logos institucionales
 ├── output/                         # Documentos firmados/generados (PDF/DOCX)
+├── test_pdf.py                     # Script de prueba para validación de PDFs
 ├── user_profile.json               # Datos del perfil guardado para autollenado
 ├── requirements.txt
 └── README.md

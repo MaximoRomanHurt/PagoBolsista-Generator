@@ -1,0 +1,30 @@
+# === Dependencias para la versión WEB (Render / Linux, y pruebas locales en Windows) ===
+
+# Backend
+fastapi>=0.110.0
+uvicorn>=0.29.0
+python-multipart>=0.0.9
+jinja2>=3.1.0
+
+# Generación y manipulación de documentos
+reportlab>=4.0.0
+Pillow>=10.0.0
+python-docx>=0.8.11
+pypdf>=3.0.0
+PyMuPDF>=1.23.0
+
+# Visión por computadora (fallback de detección de firma).
+# headless = sin dependencias gráficas del sistema (Qt/GTK).
+# Funciona igual en Windows y en Linux, así que usamos la misma
+# versión en ambos entornos para no tener dos requirements distintos.
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+
+# --- Conversión DOCX -> PDF ---
+# En Windows (pruebas locales): se usa win32com o docx2pdf (requieren MS Word).
+# Estos paquetes se instalan SOLO en Windows gracias al marker de abajo;
+# en Linux (Render) no se instalan y no hacen falta, porque ahí
+# docx_handler.py usa LibreOffice vía subprocess (no es un paquete pip,
+# se instala como paquete del sistema operativo, ver notas de despliegue).
+pywin32>=306; sys_platform == "win32"
+docx2pdf>=0.1.8; sys_platform == "win32"

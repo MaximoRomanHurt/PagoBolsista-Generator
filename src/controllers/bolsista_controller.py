@@ -4,6 +4,9 @@ Controlador unificado para los 3 documentos de Bolsistas UNMSM con autollenado.
 """
 
 import os
+import re
+import unicodedata
+
 from pdf_generator import generar_declaracion_jurada, generar_informe_actividades
 from docx_handler import DocumentSigner
 from user_profile import UserProfile
@@ -12,6 +15,61 @@ from ui.config import OUTPUT_DIR, LOGO_PATH
 
 class BolsistaController:
     """Gestiona la lógica de negocio, autollenado y llamado a los generadores."""
+
+    @staticmethod
+    def _normalizar_fragmento_nombre(valor: str) -> str:
+        """Convierte un nombre a un identificador seguro para archivos."""
+        if not valor:
+            return "usuario"
+
+        texto = unicodedata.normalize("NFKD", valor)
+        texto = texto.encode("ascii", "ignore").decode("ascii")
+        texto = re.sub(r"[^a-zA-Z0-9]+", " ", texto)
+        texto = " ".join(texto.strip().split())
+        resultado = texto.lower().replace(" ", "_")
+        return resultado or "usuario"
+
+    @staticmethod
+    def _obtener_nombre_usuario(datos: dict) -> str:
+        """Obtiene el nombre del usuario desde los campos del formulario o del perfil."""
+        perfil = UserProfile.cargar()
+        merged = {**perfil, **datos}
+
+        nombre_completo = " ".join(
+            str(parte).strip()
+            for parte in [
+                merged.get("nombres", ""),
+                merged.get("nombre", ""),
+                merged.get("de_nombre", ""),
+                merged.get("ap_paterno", ""),
+                merged.get("ap_materno", ""),
+            ]
+            if isinstance(parte, str) and parte.strip()
+        ).strip()
+
+        if nombre_completo:
+            return nombre_completo
+
+        if merged.get("nombre_completo"):
+            return str(merged.get("nombre_completo")).strip()
+
+        return "usuario"
+
+    @staticmethod
+    def build_output_name(document_type: str, datos: dict) -> str:
+        """Genera un nombre de archivo con el tipo de documento y el usuario."""
+        tipo = (document_type or "documento").strip().lower().replace(" ", "_")
+        nombre_usuario = BolsistaController._obtener_nombre_usuario(datos)
+        nombre_seguro = BolsistaController._normalizar_fragmento_nombre(nombre_usuario)
+
+        if tipo in {"declaracion", "declaracion_jurada"}:
+            return f"declaracion_jurada_{nombre_seguro}.pdf"
+        if tipo in {"asistencia", "reporte_asistencia"}:
+            return f"reporte_asistencia_{nombre_seguro}.pdf"
+        if tipo in {"informe", "informe_actividades"}:
+            return f"informe_actividades_{nombre_seguro}.pdf"
+
+        return f"{tipo}_{nombre_seguro}.pdf"
 
     @staticmethod
     def generar_declaracion(datos: dict) -> tuple[bool, str]:
@@ -28,10 +86,9 @@ class BolsistaController:
 
         try:
             os.makedirs(OUTPUT_DIR, exist_ok=True)
-            nom_clean = f"{ap_paterno}_{datos.get('ap_materno', '')}_{nombres}".replace(" ", "_")
-            nombre_archivo = f"Declaracion_Jurada_{nom_clean}.pdf"
+            nombre_archivo = BolsistaController.build_output_name("declaracion", datos)
             ruta_salida = os.path.join(OUTPUT_DIR, nombre_archivo)
-            
+
             generar_declaracion_jurada(datos, ruta_salida, logo_path=LOGO_PATH)
             return True, ruta_salida
         except Exception as e:
@@ -50,9 +107,9 @@ class BolsistaController:
 
         try:
             os.makedirs(OUTPUT_DIR, exist_ok=True)
-            base_name = os.path.splitext(os.path.basename(ruta_doc))[0]
-            nombre_salida = f"{base_name}_FIRMADO.pdf"
-            ruta_salida = os.path.join(OUTPUT_DIR, nombre_salida)
+            perfil = UserProfile.cargar()
+            nombre_archivo = BolsistaController.build_output_name("asistencia", perfil)
+            ruta_salida = os.path.join(OUTPUT_DIR, nombre_archivo)
 
             DocumentSigner.firmar_asistencia(ruta_doc, ruta_firma, ruta_salida)
             return True, ruta_salida
@@ -79,8 +136,7 @@ class BolsistaController:
 
         try:
             os.makedirs(OUTPUT_DIR, exist_ok=True)
-            nom_clean = de_nombre.replace(" ", "_")
-            nombre_archivo = f"Informe_Actividades_{nom_clean}.pdf"
+            nombre_archivo = BolsistaController.build_output_name("informe", datos)
             ruta_salida = os.path.join(OUTPUT_DIR, nombre_archivo)
 
             generar_informe_actividades(datos, ruta_salida)

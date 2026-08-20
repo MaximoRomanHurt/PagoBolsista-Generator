@@ -4,9 +4,11 @@ Servidor FastAPI para la versión WEB del Generador de Documentos de Pago — UN
 """
 
 import os
+import re
 import sys
 import tempfile
 import shutil
+import unicodedata
 from typing import List, Optional
 from fastapi import FastAPI, Request, Form, File, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
@@ -32,6 +34,15 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 
 # Configurar motor de plantillas Jinja2
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+
+def _nombre_archivo_usuario(prefijo: str, nombres: str = "", ap_paterno: str = "", ap_materno: str = "", nombre_completo: str = "") -> str:
+    """Construye un nombre de descarga seguro con el nombre del bolsista."""
+    partes = [ap_paterno, ap_materno, nombres] if any((ap_paterno, ap_materno, nombres)) else [nombre_completo]
+    nombre = " ".join(str(parte).strip() for parte in partes if str(parte).strip())
+    nombre = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode("ascii")
+    nombre = re.sub(r"[^A-Za-z0-9]+", "_", nombre).strip("_").lower() or "usuario"
+    return f"{prefijo}_{nombre}.pdf"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -84,13 +95,16 @@ def api_declaracion_jurada(
             "firma_path": firma_path
         }
 
-        output_pdf_path = os.path.join(tmpdir, "declaracion_jurada.pdf")
+        nombre_archivo = _nombre_archivo_usuario(
+            "declaracion_jurada", nombres, ap_paterno, ap_materno
+        )
+        output_pdf_path = os.path.join(tmpdir, nombre_archivo)
         try:
             generar_declaracion_jurada(datos, output_pdf_path, logo_path=logo_path)
             with open(output_pdf_path, "rb") as f:
                 pdf_bytes = f.read()
 
-            headers = {"Content-Disposition": "attachment; filename=declaracion_jurada.pdf"}
+            headers = {"Content-Disposition": f"attachment; filename={nombre_archivo}"}
             return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
         except Exception as e:
             logger.error("Error al generar la Declaración Jurada", exc_info=True)
@@ -99,6 +113,9 @@ def api_declaracion_jurada(
 
 @app.post("/api/reporte-asistencia")
 def api_reporte_asistencia(
+    ap_paterno: str = Form(...),
+    ap_materno: str = Form(...),
+    nombres: str = Form(...),
     documento: UploadFile = File(...),
     firma: UploadFile = File(...)
 ):
@@ -117,13 +134,16 @@ def api_reporte_asistencia(
         with open(firma_path, "wb") as buffer:
             shutil.copyfileobj(firma.file, buffer)
 
-        output_pdf_path = os.path.join(tmpdir, "reporte_asistencia_firmado.pdf")
+        nombre_archivo = _nombre_archivo_usuario(
+            "reporte_asistencia", nombres, ap_paterno, ap_materno
+        )
+        output_pdf_path = os.path.join(tmpdir, nombre_archivo)
         try:
             DocumentSigner.firmar_asistencia(doc_path, firma_path, output_pdf_path)
             with open(output_pdf_path, "rb") as f:
                 pdf_bytes = f.read()
 
-            headers = {"Content-Disposition": "attachment; filename=reporte_asistencia_firmado.pdf"}
+            headers = {"Content-Disposition": f"attachment; filename={nombre_archivo}"}
             return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
         except Exception as e:
             logger.error("Error al procesar el reporte de asistencia", exc_info=True)
@@ -171,13 +191,14 @@ def api_informe_actividades(
             "firma_path": firma_path
         }
 
-        output_pdf_path = os.path.join(tmpdir, "informe_actividades.pdf")
+        nombre_archivo = _nombre_archivo_usuario("informe_actividades", nombre_completo=de_nombre)
+        output_pdf_path = os.path.join(tmpdir, nombre_archivo)
         try:
             generar_informe_actividades(datos, output_pdf_path)
             with open(output_pdf_path, "rb") as f:
                 pdf_bytes = f.read()
 
-            headers = {"Content-Disposition": "attachment; filename=informe_actividades.pdf"}
+            headers = {"Content-Disposition": f"attachment; filename={nombre_archivo}"}
             return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
         except Exception as e:
             logger.error("Error al generar el Informe de Actividades", exc_info=True)

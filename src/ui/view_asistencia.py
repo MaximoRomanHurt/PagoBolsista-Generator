@@ -22,6 +22,7 @@ class ViewAsistencia(ctk.CTkFrame):
         
         self._var_doc = tk.StringVar(value="")
         self._var_firma = tk.StringVar(value="")
+        self._entries = {}
         
         self._build_ui()
         self._cargar_autollenado()
@@ -72,6 +73,19 @@ class ViewAsistencia(ctk.CTkFrame):
             font=ctk.CTkFont(weight="bold", size=12)
         ).grid(row=1, column=0, sticky="w", padx=20, pady=(15, 5))
 
+        campos_nombre = [
+            ("ap_paterno", "Apellido Paterno *"),
+            ("ap_materno", "Apellido Materno *"),
+            ("nombres", "Nombres *"),
+        ]
+        for row, (key, label) in enumerate(campos_nombre, start=2):
+            ctk.CTkLabel(body_frame, text=label, font=ctk.CTkFont(weight="bold", size=12)).grid(
+                row=row, column=0, sticky="w", padx=20, pady=(15, 5)
+            )
+            entry = ctk.CTkEntry(body_frame)
+            entry.grid(row=row, column=1, sticky="ew", padx=20, pady=(15, 5))
+            self._entries[key] = entry
+
         box_doc = ctk.CTkFrame(body_frame, fg_color="transparent")
         box_doc.grid(row=1, column=1, sticky="ew", padx=20, pady=(15, 5))
         box_doc.columnconfigure(0, weight=1)
@@ -87,10 +101,10 @@ class ViewAsistencia(ctk.CTkFrame):
         ctk.CTkLabel(
             body_frame, text="2. Imagen de tu Firma *",
             font=ctk.CTkFont(weight="bold", size=12)
-        ).grid(row=2, column=0, sticky="w", padx=20, pady=(15, 5))
+        ).grid(row=5, column=0, sticky="w", padx=20, pady=(15, 5))
 
         box_firma = ctk.CTkFrame(body_frame, fg_color="transparent")
-        box_firma.grid(row=2, column=1, sticky="ew", padx=20, pady=(15, 5))
+        box_firma.grid(row=5, column=1, sticky="ew", padx=20, pady=(15, 5))
         box_firma.columnconfigure(0, weight=1)
 
         ctk.CTkEntry(box_firma, textvariable=self._var_firma, state="readonly").grid(row=0, column=0, sticky="ew", padx=(0, 5))
@@ -109,11 +123,14 @@ class ViewAsistencia(ctk.CTkFrame):
             hover_color=COLOR_HOVER,
             height=44,
             command=self._firmar
-        ).grid(row=3, column=0, columnspan=2, padx=20, pady=35, sticky="ew")
+        ).grid(row=6, column=0, columnspan=2, padx=20, pady=35, sticky="ew")
 
     def _cargar_autollenado(self):
         """Carga la firma previamente guardada."""
         profile = UserProfile.cargar()
+        for key, entry in self._entries.items():
+            if profile.get(key):
+                entry.insert(0, profile[key])
         if profile.get("firma_path"):
             self._var_firma.set(profile["firma_path"])
 
@@ -139,8 +156,9 @@ class ViewAsistencia(ctk.CTkFrame):
         """Ejecuta el estampado de firma."""
         doc = self._var_doc.get().strip()
         firma = self._var_firma.get().strip()
+        datos = {key: entry.get().strip() for key, entry in self._entries.items()}
 
-        exito, resultado = BolsistaController.firmar_asistencia(doc, firma)
+        exito, resultado = BolsistaController.firmar_asistencia(doc, firma, datos)
         if exito:
             messagebox.showinfo("✅ Firma Completada", f"Documento firmado guardado en formato PDF:\n\n{resultado}")
         else:

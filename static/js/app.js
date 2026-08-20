@@ -257,7 +257,12 @@
 
       const blob = await respuesta.blob();
       const url  = URL.createObjectURL(blob);
-      mostrarExito(url, nombreArchivoSalida);
+      const disposition = respuesta.headers.get("Content-Disposition") || "";
+      const nombreServidor = disposition.match(/filename=([^;]+)/i);
+      const nombreArchivo = nombreServidor
+        ? nombreServidor[1].trim().replace(/^['"]|['"]$/g, "")
+        : nombreArchivoSalida;
+      mostrarExito(url, nombreArchivo);
 
     } catch (err) {
       mostrarError(err.message || "Revisa tu conexión e inténtalo nuevamente.");
@@ -284,7 +289,7 @@
   if (formAsistencia) {
     formAsistencia.addEventListener("submit", (e) => {
       e.preventDefault();
-      enviarFormulario("/api/reporte-asistencia", new FormData(e.target), "reporte_asistencia_firmado.pdf");
+      enviarFormulario("/api/reporte-asistencia", new FormData(e.target), "reporte_asistencia.pdf");
     });
   }
 

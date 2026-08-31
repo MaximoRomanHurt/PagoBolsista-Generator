@@ -135,6 +135,11 @@
     textarea.placeholder = "Describe una actividad realizada durante el mes…";
     textarea.value       = valorInicial || "";
     textarea.setAttribute("aria-label", "Actividad");
+    textarea.addEventListener("input", () => {
+      row.classList.remove("invalid");
+      const existingMarker = row.querySelector(".field-error-marker");
+      if (existingMarker) existingMarker.remove();
+    });
     row.appendChild(textarea);
 
     const btnQuitar   = document.createElement("button");
@@ -225,6 +230,106 @@
     anunciar("Ocurrió un problema al generar el documento.");
   }
 
+  function obtenerEtiquetaCampo(campo) {
+    const label = campo.closest(".campo")?.querySelector("label");
+    if (label) {
+      return label.textContent.replace(/\*+\s*$/, "").trim();
+    }
+
+    if (campo.dataset.label) return campo.dataset.label;
+    return campo.name || "campo";
+  }
+
+  function limpiarMarcadores(form) {
+    form.querySelectorAll(".invalid, .field-error-marker").forEach((el) => {
+      el.classList.remove("invalid");
+      if (el.classList.contains("field-error-marker")) {
+        el.remove();
+      }
+    });
+  }
+
+  function marcarCampoFaltante(campo) {
+    const contenedor = campo.closest(".campo") || campo.closest(".dropzone");
+    if (!contenedor) return;
+
+    contenedor.classList.add("invalid");
+    if (!contenedor.querySelector(".field-error-marker")) {
+      const marcador = document.createElement("span");
+      marcador.className = "field-error-marker";
+      marcador.textContent = "?";
+      marcador.setAttribute("title", "Falta completar este campo");
+      marcador.setAttribute("aria-label", "Falta completar este campo");
+      contenedor.appendChild(marcador);
+    }
+  }
+
+  function validarFormulario(form) {
+    limpiarMarcadores(form);
+    const camposRequeridos = form.querySelectorAll("[required]");
+
+    for (const campo of camposRequeridos) {
+      const esArchivo = campo.type === "file";
+      const tieneValor = esArchivo ? Boolean(campo.files && campo.files.length > 0) : String(campo.value || "").trim() !== "";
+
+      if (!tieneValor) {
+        const etiqueta = obtenerEtiquetaCampo(campo);
+        marcarCampoFaltante(campo);
+        campo.focus();
+        campo.scrollIntoView({ behavior: "smooth", block: "center" });
+        throw new Error(`Falta completar: ${etiqueta}.`);
+      }
+    }
+
+    if (form.id === "form-informe") {
+      const filas = Array.from(document.querySelectorAll("#lista-actividades .actividad-row"));
+      const actividades = filas
+        .map((row) => row.querySelector("textarea")?.value.trim() || "")
+        .filter(Boolean);
+
+      if (actividades.length === 0) {
+        filas.forEach((row) => {
+          row.classList.add("invalid");
+          if (!row.querySelector(".field-error-marker")) {
+            const marcador = document.createElement("span");
+            marcador.className = "field-error-marker";
+            marcador.textContent = "?";
+            marcador.setAttribute("title", "Debes escribir al menos una actividad");
+            row.appendChild(marcador);
+          }
+        });
+
+        const primeraFila = filas[0];
+        const primerTextarea = primeraFila?.querySelector("textarea");
+        if (primerTextarea) {
+          primerTextarea.focus();
+          primerTextarea.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+        const bloque = document.getElementById("lista-actividades");
+        bloque.classList.add("invalid");
+        throw new Error("Debes escribir al menos una actividad antes de generar el informe.");
+      }
+
+      if (archivosEvidencia.length === 0) {
+        const dropzoneEvidencias = document.getElementById("inf-evidencias").closest(".dropzone");
+        if (dropzoneEvidencias) {
+          dropzoneEvidencias.classList.add("invalid");
+          if (!dropzoneEvidencias.querySelector(".field-error-marker")) {
+            const marcador = document.createElement("span");
+            marcador.className = "field-error-marker";
+            marcador.textContent = "?";
+            marcador.setAttribute("title", "Debes seleccionar al menos una evidencia");
+            dropzoneEvidencias.appendChild(marcador);
+          }
+        }
+        throw new Error("Debes seleccionar al menos una foto de evidencia.");
+      }
+    }
+
+    return true;
+  }
+
   btnCerrarOverlay.addEventListener("click", () => {
     overlay.classList.remove("active");
   });
@@ -279,8 +384,13 @@
   if (formDeclaracion) {
     formDeclaracion.addEventListener("submit", (e) => {
       e.preventDefault();
-      guardarPerfilDesdeFormulario(e.target);
-      enviarFormulario("/api/declaracion-jurada", new FormData(e.target), "declaracion_jurada.pdf");
+      try {
+        validarFormulario(e.target);
+        guardarPerfilDesdeFormulario(e.target);
+        enviarFormulario("/api/declaracion-jurada", new FormData(e.target), "declaracion_jurada.pdf");
+      } catch (err) {
+        mostrarError(err.message || "Completa todos los campos requeridos.");
+      }
     });
   }
 
@@ -289,7 +399,12 @@
   if (formAsistencia) {
     formAsistencia.addEventListener("submit", (e) => {
       e.preventDefault();
-      enviarFormulario("/api/reporte-asistencia", new FormData(e.target), "reporte_asistencia.pdf");
+      try {
+        validarFormulario(e.target);
+        enviarFormulario("/api/reporte-asistencia", new FormData(e.target), "reporte_asistencia.pdf");
+      } catch (err) {
+        mostrarError(err.message || "Completa todos los campos requeridos.");
+      }
     });
   }
 
@@ -298,19 +413,24 @@
   if (formInforme) {
     formInforme.addEventListener("submit", (e) => {
       e.preventDefault();
-      const formData = new FormData(e.target);
+      try {
+        validarFormulario(e.target);
+        const formData = new FormData(e.target);
 
-      // Actividades: una por línea (compatible con pdf_generator.py que hace split("\n"))
-      const textos = Array.from(document.querySelectorAll("#lista-actividades textarea"))
-        .map((t) => t.value.trim())
-        .filter(Boolean);
-      formData.append("actividades", textos.join("\n"));
+        // Actividades: una por línea (compatible con pdf_generator.py que hace split("\n"))
+        const textos = Array.from(document.querySelectorAll("#lista-actividades textarea"))
+          .map((t) => t.value.trim())
+          .filter(Boolean);
+        formData.append("actividades", textos.join("\n"));
 
-      // Evidencias gestionadas manualmente (array propio, no el input directamente)
-      archivosEvidencia.forEach((file) => formData.append("evidencias", file));
+        // Evidencias gestionadas manualmente (array propio, no el input directamente)
+        archivosEvidencia.forEach((file) => formData.append("evidencias", file));
 
-      guardarPerfilDesdeFormulario(e.target);
-      enviarFormulario("/api/informe-actividades", formData, "informe_actividades.pdf");
+        guardarPerfilDesdeFormulario(e.target);
+        enviarFormulario("/api/informe-actividades", formData, "informe_actividades.pdf");
+      } catch (err) {
+        mostrarError(err.message || "Completa todos los campos requeridos.");
+      }
     });
   }
 

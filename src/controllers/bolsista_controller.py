@@ -1,4 +1,4 @@
-"""
+﻿"""
 bolsista_controller.py
 Controlador unificado para los 3 documentos de Bolsistas UNMSM con autollenado.
 """
@@ -22,7 +22,7 @@ class BolsistaController:
         if not valor:
             return "usuario"
 
-        texto = unicodedata.normalize("NFKD", valor)
+        texto = unicodedata.normalize("NFKD", str(valor))
         texto = texto.encode("ascii", "ignore").decode("ascii")
         texto = re.sub(r"[^a-zA-Z0-9]+", " ", texto)
         texto = " ".join(texto.strip().split())
@@ -62,14 +62,17 @@ class BolsistaController:
         nombre_usuario = BolsistaController._obtener_nombre_usuario(datos)
         nombre_seguro = BolsistaController._normalizar_fragmento_nombre(nombre_usuario)
 
-        if tipo in {"declaracion", "declaracion_jurada"}:
-            return f"declaracion_jurada_{nombre_seguro}.pdf"
-        if tipo in {"asistencia", "reporte_asistencia"}:
-            return f"reporte_asistencia_{nombre_seguro}.pdf"
-        if tipo in {"informe", "informe_actividades"}:
-            return f"informe_actividades_{nombre_seguro}.pdf"
+        prefijos = {
+            "declaracion": "declaracion_jurada",
+            "declaracion_jurada": "declaracion_jurada",
+            "asistencia": "reporte_asistencia",
+            "reporte_asistencia": "reporte_asistencia",
+            "informe": "informe_actividades",
+            "informe_actividades": "informe_actividades",
+        }
 
-        return f"{tipo}_{nombre_seguro}.pdf"
+        prefijo = prefijos.get(tipo, tipo)
+        return f"{prefijo}_{nombre_seguro}.pdf"
 
     @staticmethod
     def generar_declaracion(datos: dict) -> tuple[bool, str]:
@@ -81,7 +84,6 @@ class BolsistaController:
         if not (nombres and ap_paterno and dni):
             return False, "Los campos Nombres, Apellido Paterno y DNI son obligatorios."
 
-        # Guardar en el perfil de autollenado
         UserProfile.guardar(datos)
 
         try:
@@ -95,20 +97,22 @@ class BolsistaController:
             return False, f"Error al generar Declaración Jurada: {str(e)}"
 
     @staticmethod
-    def firmar_asistencia(ruta_doc: str, ruta_firma: str) -> tuple[bool, str]:
+    def firmar_asistencia(ruta_doc: str, ruta_firma: str, datos: dict | None = None) -> tuple[bool, str]:
         """Estampado de firma sobre la asistencia (salida SIEMPRE en PDF)."""
+        datos = datos or {}
         if not ruta_doc or not os.path.exists(ruta_doc):
             return False, "Debe seleccionar un archivo de asistencia (.docx o .pdf) válido."
         if not ruta_firma or not os.path.exists(ruta_firma):
             return False, "Debe seleccionar la imagen de su firma."
+        if not all(str(datos.get(campo, "")).strip() for campo in ("ap_paterno", "ap_materno", "nombres")):
+            return False, "Los campos Nombres, Apellido Paterno y Apellido Materno son obligatorios."
 
-        # Guardar la ruta de la firma en el perfil
         UserProfile.guardar({"firma_path": ruta_firma})
 
         try:
             os.makedirs(OUTPUT_DIR, exist_ok=True)
             perfil = UserProfile.cargar()
-            nombre_archivo = BolsistaController.build_output_name("asistencia", perfil)
+            nombre_archivo = BolsistaController.build_output_name("asistencia", {**perfil, **datos})
             ruta_salida = os.path.join(OUTPUT_DIR, nombre_archivo)
 
             DocumentSigner.firmar_asistencia(ruta_doc, ruta_firma, ruta_salida)
@@ -123,9 +127,8 @@ class BolsistaController:
         para_nombre = datos.get("para_nombre", "").strip()
 
         if not (de_nombre and para_nombre):
-            return False, "Debe completar al menos los campos 'Remitente (De:)' y 'Destinatario (A:)'."
+            return False, "Debe completar al menos los campos 'Remitente (De:)' y 'Destinatario (A:)' ."
 
-        # Guardar en el perfil de autollenado
         UserProfile.guardar({
             "de_nombre": de_nombre,
             "para_nombre": para_nombre,

@@ -211,9 +211,42 @@ main { max-width: 920px; margin: 0 auto; padding: 44px 24px 80px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 18px; }
 @media (max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
 
-.campo       { display: flex; flex-direction: column; gap: 6px; }
+.campo       { display: flex; flex-direction: column; gap: 6px; position: relative; }
 .campo label { font-size: 12.5px; color: var(--ink-soft); font-weight: 500; }
 .campo .req  { color: var(--maroon); }
+.campo.invalid,
+.dropzone.invalid,
+.actividad-row.invalid {
+  border-color: #b33a3a;
+  box-shadow: 0 0 0 2px rgba(179, 58, 58, 0.12);
+}
+
+.actividad-row.invalid {
+  position: relative;
+  border: 1px solid #b33a3a;
+  border-radius: 2px;
+  padding: 8px 8px 6px;
+  background: rgba(179, 58, 58, 0.03);
+}
+
+.field-error-marker {
+  position: absolute;
+  top: -10px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #b33a3a;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 3px 10px rgba(179, 58, 58, 0.25);
+  z-index: 3;
+}
 
 .campo input[type=text],
 .campo input[type=email],
